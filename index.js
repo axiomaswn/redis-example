@@ -5,11 +5,14 @@ var mysql      = require('mysql');
 const express = require('express')
 const app = express()
 
-var connection = mysql.createConnection({
+var pool = mysql.createPool({
+  connectionLimit: 1000,
   host     : process.env.DB_HOST,
   user     : process.env.DB_USER,
   password : process.env.DB_PASS,
-  database : 'newredis'
+  database : 'newredis',
+  charset  : 'utf8mb4',
+  // debug    : false
 });
 
 app.get('/', function (req, res) {
@@ -25,27 +28,36 @@ app.get('/', function (req, res) {
     } else {
 
       /* get all users */
-      connection.connect();
-      connection.query('SELECT * FROM users', function (error, results, fields) {
-        if (error) throw error;
-        /* set data to redis */
-        client.set("list_user", JSON.stringify(results), redis.print);
-        res.send(results)
+      pool.getConnection(function(err,connection){
+      	if (err) {
+      		console.log('Error in connection database');
+      	}
+      	console.log('connected as id ' + connection.threadId);
+        connection.query('SELECT * FROM users', function (error, results, fields) {
+          if (error) throw error;
+          /* set data to redis */
+          client.set("list_user", JSON.stringify(results), redis.print);
+          res.send(results)
+        });
       });
-      connection.end();
+
+      // connection.end();
 
     }
 
   })
+  // pool.end(function (err) {
+  // all connections in the pool have ended
+// });
 
 })
 
-app.post('/addNewItem', function (req, res) {
-
-})
+// app.post('/addNewItem', function (req, res) {
+//
+// })
 
 app.listen(3000, function () {
-  console.log('Example app listening on port 3000!')
-  console.log('Host : '+process.env.DB_HOST);
-  console.log('User : '+process.env.DB_USER);
+  console.log('Example app listening on port 3000! Connection using pool')
+  console.log('HOST : '+process.env.DB_HOST);
+  console.log('USER : '+process.env.DB_USER);
 })
